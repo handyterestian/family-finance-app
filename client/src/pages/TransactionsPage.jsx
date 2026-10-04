@@ -212,10 +212,10 @@ export default function TransactionsPage() {
   const overCount    = allBudgetCategories.filter(r => r.budget > 0 && r.spent > r.budget).length
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-800">💳 Transaksi</h1>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <input
             type="month"
             value={month}
@@ -310,8 +310,8 @@ export default function TransactionsPage() {
       </div>
 
       {/* Tabel transaksi */}
-      <div className="card overflow-hidden p-0">
-        <table className="w-full text-sm">
+      <div className="card overflow-hidden p-0 overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Tanggal</th>

@@ -125,7 +125,7 @@ export default function EmergencyFundPage() {
   )
 
   return (
-    <div className="p-6 space-y-5 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-5 max-w-3xl mx-auto">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -135,9 +135,9 @@ export default function EmergencyFundPage() {
 
       {/* Card utama — progress ring + info */}
       <div className="card">
-        <div className="flex items-center gap-8">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-8">
           {/* Ring */}
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 self-center">
             <ProgressRing pct={progressPct} size={140} stroke={12} />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className={`text-xl font-bold ${progressColor}`}>{progressPct.toFixed(0)}%</span>

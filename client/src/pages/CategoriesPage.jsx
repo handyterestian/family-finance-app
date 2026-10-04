@@ -51,14 +51,14 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-800">🏷️ Kategori</h1>
         <button onClick={openCreate} className="btn-primary">+ Tambah Kategori</button>
       </div>
 
-      <div className="card overflow-hidden p-0">
-        <table className="w-full text-sm">
+      <div className="card overflow-x-auto p-0">
+        <table className="w-full text-sm min-w-[320px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Nama Kategori</th>

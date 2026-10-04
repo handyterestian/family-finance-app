@@ -175,8 +175,8 @@ export default function BudgetsPage() {
   )
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-800">📋 Anggaran</h1>
         <div className="flex gap-2 items-center flex-wrap">
           <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="input w-40" />
@@ -188,8 +188,8 @@ export default function BudgetsPage() {
       </div>
 
       {/* Tabel Anggaran */}
-      <div className="card overflow-hidden p-0">
-        <table className="w-full text-sm">
+      <div className="card overflow-x-auto p-0">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Kategori</th>
@@ -262,8 +262,8 @@ export default function BudgetsPage() {
         {recurring.length === 0 ? (
           <p className="text-xs text-gray-400 py-2">Belum ada template anggaran berulang. Tambahkan agar anggaran bisa diterapkan otomatis tiap bulan.</p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-100">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-gray-100">
+            <table className="w-full text-sm min-w-[320px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-4 py-2.5 font-medium text-gray-600">Kategori</th>
