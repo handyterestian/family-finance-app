@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [wallets, setWallets] = useState([])
+  const [recentTxs, setRecentTxs] = useState([])
 
   const currentUser = useCurrentUser()
   const username    = currentUser?.username || ''
@@ -79,11 +80,17 @@ export default function DashboardPage() {
       api.get('/dashboard'),
       api.get('/budgets', { params: { month: thisMonth() } }).catch(() => ({ data: { budgets: [] } })),
       walletAPI.list().catch(() => ({ data: { wallets: [] } })),
+      api.get('/transactions', { params: { month: thisMonth() } }).catch(() => ({ data: { transactions: [] } })),
     ])
-      .then(([dashRes, budRes, wallRes]) => {
+      .then(([dashRes, budRes, wallRes, txRes]) => {
         setData(dashRes.data)
         setBudgets(budRes.data?.budgets || [])
         setWallets(wallRes.data?.wallets || [])
+        const txs = (txRes.data?.transactions || []).slice().sort((a, b) => {
+          if (b.date !== a.date) return b.date.localeCompare(a.date)
+          return b.created_at?.localeCompare(a.created_at || '') || 0
+        })
+        setRecentTxs(txs)
         setError(null)
       })
       .catch(err => {
@@ -510,40 +517,77 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Pengeluaran per Kategori */}
+        {/* Transaksi Terbaru */}
         <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Pengeluaran per Kategori</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">🕐 Transaksi Terbaru</h3>
           <ExpandableList
-            items={data?.category_spending || []}
-            emptyText="Belum ada pengeluaran bulan ini"
-            limit={3}
-            renderItem={cs => (
-              <div key={cs.category_name} className="mb-2.5">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-gray-600 truncate">{cs.category_name}</span>
-                  <span className="text-gray-500 ml-2 shrink-0">
-                    {rupiah(cs.spent)}{cs.budget > 0 ? ` / ${rupiah(cs.budget)}` : ''}
-                  </span>
+            items={recentTxs}
+            emptyText="Belum ada transaksi bulan ini"
+            limit={5}
+            renderItem={tx => {
+              const isIncome  = tx.type === 'income'
+              const isExpense = tx.type === 'expense'
+              const budget    = isExpense
+                ? budgets.find(b => b.category_name === tx.category_name)
+                : null
+              const catSpend  = isExpense && budget
+                ? (data?.category_spending || []).find(cs => cs.category_name === tx.category_name)
+                : null
+              const budgetPct = catSpend && budget
+                ? Math.min(100, (catSpend.spent / budget.amount) * 100)
+                : null
+              return (
+                <div key={tx.id} className="flex items-start gap-2 py-2 border-b border-gray-50 last:border-0">
+                  <div className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${isIncome ? 'bg-green-500' : 'bg-red-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={`text-xs font-semibold ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                        {isIncome ? '+' : '-'}{rupiah(tx.amount)}
+                      </span>
+                      <span className="text-[10px] text-gray-400 shrink-0">{fmtDate(tx.date)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                      {tx.category_name && (
+                        <span className="text-[10px] text-gray-500 truncate">{tx.category_name}</span>
+                      )}
+                      {tx.member && (
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1 rounded">
+                          {tx.member}
+                        </span>
+                      )}
+                      {tx.wallet_name && (
+                        <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1 rounded truncate">
+                          {tx.wallet_name}
+                        </span>
+                      )}
+                    </div>
+                    {isExpense && budget && budgetPct !== null && (
+                      <div className="mt-1">
+                        <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
+                          <span>Anggaran {tx.category_name}</span>
+                          <span className={budgetPct >= 100 ? 'text-red-500 font-medium' : budgetPct >= 80 ? 'text-yellow-500 font-medium' : 'text-gray-400'}>
+                            {budgetPct.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${progressColor(budgetPct)}`}
+                            style={{ width: `${budgetPct}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">
+                          {rupiah(catSpend?.spent || 0)} / {rupiah(budget.amount)}
+                        </div>
+                      </div>
+                    )}
+                    {isExpense && !budget && tx.category_name && (
+                      <span className="text-[10px] text-gray-300 italic">Tanpa anggaran</span>
+                    )}
+                  </div>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${progressColor(cs.pct_used || 0)}`}
-                    style={{ width: `${Math.min(100, cs.pct_used || 0)}%` }}
-                  />
-                </div>
-              </div>
-            )}
+              )
+            }}
           />
-          {/* Pengeluaran per anggota — compact chips di bawah */}
-          {(data?.member_spending || []).length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-50 flex flex-wrap gap-1.5">
-              {(data.member_spending || []).map(ms => (
-                <span key={ms.member} className="badge bg-gray-100 text-gray-600 text-[10px]">
-                  {ms.member} {rupiah(ms.spent)}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Hutang Bulan Ini */}
