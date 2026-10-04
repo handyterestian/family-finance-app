@@ -149,12 +149,13 @@ docker compose down -v
 - **Setoran Berkala:** Form setoran tabungan dengan histori mutasi dan grafik progres capaian target.
 
 ### 7. 📊 Dashboard Finansial & Financial Health Score
-- **Skor Kesehatan Keuangan (0–100):** Analisis otomatis berdasarkan 4 pilar finansial:
-  - *Rasio Tabungan* (Maks 30 poin)
-  - *Disiplin Anggaran* (Maks 25 poin)
-  - *Kecukupan Dana Darurat* (Maks 25 poin)
-  - *Rasio Beban Hutang* (Maks 20 poin)
-- **Saran & Rekomendasi Pintar:** Rekomendasi aksi perbaikan otomatis berdasarkan indikator kesehatan finansial yang paling rendah.
+- **Skor Kesehatan Keuangan (0–100):** Analisis otomatis & komprehensif berdasarkan 4 pilar finansial utama:
+  - *Rasio Tabungan (Maks 30 poin):* Menilai progres akumulasi tabungan terhadap target yang ditentukan.
+  - *Disiplin Anggaran (Maks 25 poin):* Mengukur kepatuhan pengeluaran terhadap batas pos anggaran per kategori tanpa overbudget.
+  - *Kecukupan Dana Darurat (Maks 25 poin):* Mengukur kesiapan proteksi kas darurat (rasio bulan cadangan terhadap target ideal 6 bulan).
+  - *Rasio Beban Hutang (Maks 20 poin):* Menganalisis *Debt Service Ratio* (porsi cicilan bulanan terhadap total pemasukan keluarga, ambang aman $\le$ 30%).
+- **Visualisasi Progress Ring & Status Badge:** Indikator visual dinamis (*Sangat Baik, Sehat, Cukup, Perlu Perhatian*) beserta breakdown progress per pilar di antarmuka Dashboard.
+- **Saran & Rekomendasi Pintar:** Algoritma deteksi kondisi kritis (beban cicilan >40%, overbudget >50%, proteksi <1 bulan) dan saran perbaikan spesifik berbasis pilar finansial terlemah.
 - **Visualisasi Analitik:** Grafik pengeluaran per kategori belanja dan kontribusi pengeluaran per anggota keluarga.
 
 ### 8. 🏷️ Kategori Kustom

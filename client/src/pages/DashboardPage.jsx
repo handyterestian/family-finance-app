@@ -243,6 +243,130 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Financial Health Score Component ──────────────── */}
+      {data?.health_score && (
+        <div className="card bg-gradient-to-br from-white via-indigo-50/20 to-blue-50/30 border-indigo-100/80 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            
+            {/* Score Ring & Badge */}
+            <div className="flex items-center gap-5 sm:border-r sm:border-gray-100 sm:pr-6 shrink-0">
+              <div className="relative flex items-center justify-center">
+                <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-gray-100"
+                    strokeWidth="3.2"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className={`transition-all duration-1000 ease-out ${
+                      data.health_score.total >= 80 ? 'text-green-500' :
+                      data.health_score.total >= 60 ? 'text-blue-500' :
+                      data.health_score.total >= 40 ? 'text-amber-500' : 'text-red-500'
+                    }`}
+                    strokeDasharray={`${Math.min(100, data.health_score.total || 0)}, 100`}
+                    strokeWidth="3.2"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center text-center">
+                  <span className="text-2xl font-black text-gray-800 tracking-tight">
+                    {Math.round(data.health_score.total || 0)}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider font-semibold text-gray-400">/ 100</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-gray-800">Skor Kesehatan Finansial</h2>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    data.health_score.total >= 80 ? 'bg-green-100 text-green-700' :
+                    data.health_score.total >= 60 ? 'bg-blue-100 text-blue-700' :
+                    data.health_score.total >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {data.health_score.total >= 80 ? 'Sangat Baik' :
+                     data.health_score.total >= 60 ? 'Sehat' :
+                     data.health_score.total >= 40 ? 'Cukup' : 'Perlu Perhatian'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 max-w-md leading-relaxed">
+                  {data.health_score.advice}
+                </p>
+              </div>
+            </div>
+
+            {/* 4 Pillars Breakdown */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+              {/* Tabungan */}
+              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-2xs">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-gray-500 flex items-center gap-1 font-medium">🎯 Tabungan</span>
+                  <span className="font-bold text-teal-600">{data.health_score.savings_score || 0}<span className="text-[10px] text-gray-400 font-normal">/30</span></span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, ((data.health_score.savings_score || 0) / 30) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1.5">Progres target tabungan</div>
+              </div>
+
+              {/* Anggaran */}
+              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-2xs">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-gray-500 flex items-center gap-1 font-medium">📋 Anggaran</span>
+                  <span className="font-bold text-indigo-600">{data.health_score.budget_score || 0}<span className="text-[10px] text-gray-400 font-normal">/25</span></span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, ((data.health_score.budget_score || 0) / 25) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1.5">Disiplin limit belanja</div>
+              </div>
+
+              {/* Dana Darurat */}
+              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-2xs">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-gray-500 flex items-center gap-1 font-medium">🛡️ Darurat</span>
+                  <span className="font-bold text-blue-600">{data.health_score.emergency_fund_score || 0}<span className="text-[10px] text-gray-400 font-normal">/25</span></span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, ((data.health_score.emergency_fund_score || 0) / 25) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1.5">Kesiapan proteksi kas</div>
+              </div>
+
+              {/* Hutang */}
+              <div className="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-2xs">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-gray-500 flex items-center gap-1 font-medium">🏦 Hutang</span>
+                  <span className="font-bold text-purple-600">{data.health_score.debt_score || 0}<span className="text-[10px] text-gray-400 font-normal">/20</span></span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, ((data.health_score.debt_score || 0) / 20) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1.5">Rasio beban cicilan</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* ── Quick-add Transaksi ───────────────────────────── */}
       <div className="card">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">⚡ Catat Transaksi Cepat</h2>

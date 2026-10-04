@@ -186,59 +186,101 @@ func (s *DashboardServer) GetDashboard(ctx context.Context, req *finance.GetDash
 func calcHealthScore(savCurrent, savTarget float64, totalBudgetCats, overspend int,
 	monthsCovered, totalIncome float64, upcomingDebts []*finance.Debt) *finance.HealthScore {
 
-	// savings_score (30)
+	// 1. Savings Score (Maks 30)
 	var savScore float64
 	if savTarget > 0 {
-		savScore = math.Min(savCurrent/savTarget, 1.0) * 30
+		savScore = math.Min(savCurrent/savTarget, 1.0) * 30.0
+	} else if savCurrent > 0 {
+		savScore = 15.0 // baseline jika ada tabungan tanpa target spesifik
+	} else {
+		savScore = 0.0
 	}
 
-	// budget_score (25)
+	// 2. Budget Discipline Score (Maks 25)
 	var budScore float64
 	if totalBudgetCats > 0 {
-		budScore = float64(totalBudgetCats-overspend) / float64(totalBudgetCats) * 25
+		ratio := float64(totalBudgetCats-overspend) / float64(totalBudgetCats)
+		if ratio < 0 {
+			ratio = 0
+		}
+		budScore = ratio * 25.0
+	} else {
+		// Jika belum pasang anggaran sama sekali, beri baseline 15
+		budScore = 15.0
 	}
 
-	// emergency_fund_score (25)
-	efScore := math.Min(monthsCovered/6.0, 1.0) * 25
+	// 3. Emergency Fund Score (Maks 25)
+	efScore := math.Min(monthsCovered/6.0, 1.0) * 25.0
 
-	// debt_score (20)
+	// 4. Debt Service Ratio Score (Maks 20)
 	var totalMonthlyDebt float64
 	for _, d := range upcomingDebts {
 		totalMonthlyDebt += d.MonthlyPayment
 	}
-	var debtScore float64 = 20
+	var debtScore float64 = 20.0
 	if totalIncome > 0 {
-		debtScore = math.Max(0, 1-totalMonthlyDebt/totalIncome) * 20
+		debtRatio := totalMonthlyDebt / totalIncome
+		if debtRatio <= 0.30 {
+			// Rasio cicilan <= 30% dari penghasilan dianggap sehat
+			debtScore = 20.0 - (debtRatio / 0.30 * 4.0) // 16 - 20
+		} else if debtRatio <= 0.50 {
+			// Rasio 30% - 50% waspada
+			debtScore = 16.0 - ((debtRatio - 0.30) / 0.20 * 8.0) // 8 - 16
+		} else {
+			// Rasio > 50% kritis
+			debtScore = math.Max(0.0, 8.0-((debtRatio-0.50)/0.50*8.0))
+		}
+	} else if totalMonthlyDebt > 0 {
+		debtScore = 5.0
 	}
 
-	total := savScore + budScore + efScore + debtScore
+	total := math.Min(100.0, math.Max(0.0, savScore+budScore+efScore+debtScore))
 
-	// Saran otomatis berdasarkan komponen paling lemah
-	advice := generateAdvice(savScore/30, budScore/25, efScore/25, debtScore/20)
+	// Saran dinamis berdasarkan analisis menyeluruh
+	advice := generateAdvice(savScore, budScore, efScore, debtScore, total, monthsCovered, totalMonthlyDebt, totalIncome, totalBudgetCats, overspend)
 
 	return &finance.HealthScore{
-		SavingsScore:       savScore,
-		BudgetScore:        budScore,
-		EmergencyFundScore: efScore,
-		DebtScore:          debtScore,
-		Total:              total,
+		SavingsScore:       math.Round(savScore*10) / 10,
+		BudgetScore:        math.Round(budScore*10) / 10,
+		EmergencyFundScore: math.Round(efScore*10) / 10,
+		DebtScore:          math.Round(debtScore*10) / 10,
+		Total:              math.Round(total),
 		Advice:             advice,
 	}
 }
 
-func generateAdvice(savRatio, budRatio, efRatio, debtRatio float64) string {
+func generateAdvice(savScore, budScore, efScore, debtScore, total, monthsCovered, totalMonthlyDebt, totalIncome float64, totalBudgetCats, overspend int) string {
+	savRatio := savScore / 30.0
+	budRatio := budScore / 25.0
+	efRatio := efScore / 25.0
+	debtRatio := debtScore / 20.0
+
+	// Jika ada kondisi darurat mendesak
+	if totalIncome > 0 && totalMonthlyDebt/totalIncome > 0.40 {
+		return "⚠️ Beban cicilan melebihi 40% dari total pemasukan. Hindari menambah hutang baru dan fokus alokasikan dana untuk melunasi hutang berjalan."
+	}
+	if overspend > 0 && totalBudgetCats > 0 && float64(overspend)/float64(totalBudgetCats) >= 0.5 {
+		return "⚠️ Lebih dari 50% pos anggaran Anda mengalami overbudget bulan ini. Disarankan melakukan rem pengeluaran non-esensial."
+	}
+	if monthsCovered < 1.0 {
+		return "🛡️ Dana darurat Anda masih di bawah 1 bulan pengeluaran. Jadikan pengisian dana darurat sebagai prioritas utama."
+	}
+
+	// Evaluasi pilar terlemah
 	minRatio := math.Min(savRatio, math.Min(budRatio, math.Min(efRatio, debtRatio)))
 	switch {
-	case minRatio == efRatio && efRatio < 0.5:
-		return "Dana darurat Anda masih di bawah 3 bulan. Prioritaskan menabung untuk dana darurat sebelum pengeluaran lainnya."
-	case minRatio == debtRatio && debtRatio < 0.6:
-		return "Beban cicilan Anda cukup besar relatif terhadap pemasukan. Pertimbangkan untuk melunasi hutang dengan bunga tertinggi terlebih dahulu."
-	case minRatio == budRatio && budRatio < 0.6:
-		return "Beberapa kategori anggaran sudah melebihi batas. Tinjau kembali pengeluaran bulan ini dan sesuaikan anggaran Anda."
-	case minRatio == savRatio && savRatio < 0.5:
-		return "Progres tabungan Anda masih rendah. Coba sisihkan minimal 10% dari pemasukan setiap bulan untuk mencapai target lebih cepat."
+	case minRatio == efRatio && efRatio < 0.6:
+		return fmt.Sprintf("🛡️ Dana darurat saat ini baru mencakup %.1f bulan pengeluaran. Tingkatkan hingga idealnya 6 bulan untuk stabilitas finansial.", monthsCovered)
+	case minRatio == budRatio && budRatio < 0.7:
+		return "📋 Kedisiplinan anggaran perlu ditingkatkan. Periksa kembali pengeluaran pos yang melebihi batas dan buat penyesuaian."
+	case minRatio == debtRatio && debtRatio < 0.7:
+		return "🏦 Porsi cicilan hutang cukup menggerus arus kas bulanan. Pertimbangkan strategi debt avalanche atau debt snowball untuk percepatan pelunasan."
+	case minRatio == savRatio && savRatio < 0.6:
+		return "🎯 Capaian target tabungan masih belum optimal. Sisihkan minimal 10%–20% dari setiap pemasukan di awal bulan secara konsisten."
+	case total >= 80:
+		return "🌟 Luar biasa! Kesehatan finansial keluarga Anda sangat sehat dan terjaga dengan baik. Terus pertahankan pengelolaan anggaran yang disiplin!"
 	default:
-		return "Keuangan keluarga Anda dalam kondisi baik. Pertahankan kebiasaan menabung dan patuhi anggaran yang sudah ditetapkan."
+		return "💡 Kondisi keuangan keluarga cukup stabil. Jaga keseimbangan antara alokasi tabungan, dana darurat, dan konsumsi harian."
 	}
 }
 
