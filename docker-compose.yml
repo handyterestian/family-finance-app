@@ -1,0 +1,82 @@
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: finance_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${DB_USER:-finance_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-finance_pass}
+      POSTGRES_DB:       ${DB_NAME:-finance_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-finance_user} -d ${DB_NAME:-finance_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - finance_net
+
+  # ── Go gRPC Server ────────────────────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: finance_server
+    restart: unless-stopped
+    environment:
+      DB_HOST:     postgres
+      DB_PORT:     5432
+      DB_USER:     ${DB_USER:-finance_user}
+      DB_PASSWORD: ${DB_PASSWORD:-finance_pass}
+      DB_NAME:     ${DB_NAME:-finance_db}
+      GRPC_PORT:   50051
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - finance_net
+
+  # ── Go HTTP Gateway ───────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: finance_gateway
+    restart: unless-stopped
+    environment:
+      GRPC_HOST:    server
+      GRPC_PORT:    50051
+      GATEWAY_PORT: 8000
+      CORS_ORIGIN:  http://localhost:8080
+    depends_on:
+      - server
+    networks:
+      - finance_net
+
+  # ── React Client (Nginx) ──────────────────────────────────
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: finance_client
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - gateway
+    networks:
+      - finance_net
+
+networks:
+  finance_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local

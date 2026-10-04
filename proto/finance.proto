@@ -1,0 +1,682 @@
+syntax = "proto3";
+
+package finance;
+
+option go_package = "./generated;finance";
+
+// ─────────────────────────────────────────────────────────────
+// AUTH SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service AuthService {
+  rpc Register   (RegisterRequest)  returns (StatusResponse);
+  rpc Login      (LoginRequest)     returns (LoginResponse);
+  rpc Logout     (SessionRequest)   returns (StatusResponse);
+  rpc GetSession (SessionRequest)   returns (SessionResponse);
+}
+
+message RegisterRequest {
+  string username    = 1;
+  string email       = 2;
+  string password    = 3;
+  string family_name = 4;
+}
+
+message LoginRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  bool   success    = 1;
+  string message    = 2;
+  string session_id = 3;
+}
+
+message SessionRequest {
+  string session_id = 1;
+}
+
+message SessionResponse {
+  bool   valid      = 1;
+  string user_id    = 2;
+  string family_id  = 3;
+  string username   = 4;
+}
+
+message StatusResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// ─────────────────────────────────────────────────────────────
+// CATEGORY SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service CategoryService {
+  rpc ListCategories (ListCategoriesRequest)  returns (CategoryListResponse);
+  rpc CreateCategory (CreateCategoryRequest)  returns (CategoryResponse);
+  rpc UpdateCategory (UpdateCategoryRequest)  returns (CategoryResponse);
+  rpc DeleteCategory (DeleteCategoryRequest)  returns (StatusResponse);
+}
+
+message Category {
+  string id         = 1;
+  string family_id  = 2;
+  string name       = 3;
+  string type       = 4; // income | expense | both
+  string created_at = 5;
+}
+
+message ListCategoriesRequest {
+  string session_id = 1;
+}
+
+message CreateCategoryRequest {
+  string session_id = 1;
+  string name       = 2;
+  string type       = 3; // income | expense | both
+}
+
+message UpdateCategoryRequest {
+  string session_id = 1;
+  string name       = 2;     // current name (lookup key)
+  string new_name   = 3;     // new name to rename to
+  string type       = 4;     // income | expense | both
+}
+
+message DeleteCategoryRequest {
+  string session_id = 1;
+  string name       = 2;
+}
+
+message CategoryResponse {
+  bool     success  = 1;
+  string   message  = 2;
+  Category category = 3;
+}
+
+message CategoryListResponse {
+  bool              success    = 1;
+  repeated Category categories = 2;
+}
+
+// ─────────────────────────────────────────────────────────────
+// WALLET SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service WalletService {
+  rpc CreateWallet  (CreateWalletRequest)  returns (WalletResponse);
+  rpc ListWallets   (ListWalletsRequest)   returns (WalletListResponse);
+  rpc UpdateWallet  (UpdateWalletRequest)  returns (WalletResponse);
+  rpc DeleteWallet  (DeleteWalletRequest)  returns (StatusResponse);
+  rpc TransferWallet (TransferWalletRequest) returns (TransferWalletResponse);
+}
+
+message Wallet {
+  string id         = 1;
+  string family_id  = 2;
+  string name       = 3;
+  string type       = 4; // cash | bank | e-wallet | investment | other
+  double balance    = 5;
+  string color      = 6; // hex color untuk UI
+  string note       = 7;
+  string created_at = 8;
+}
+
+message WalletTransfer {
+  string id            = 1;
+  string from_wallet_id = 2;
+  string to_wallet_id   = 3;
+  double amount        = 4;
+  string note          = 5;
+  string date          = 6;
+  string created_at    = 7;
+}
+
+message CreateWalletRequest {
+  string session_id = 1;
+  string name       = 2;
+  string type       = 3;
+  double balance    = 4;
+  string color      = 5;
+  string note       = 6;
+}
+
+message ListWalletsRequest {
+  string session_id = 1;
+}
+
+message UpdateWalletRequest {
+  string session_id = 1;
+  string wallet_id  = 2;
+  string name       = 3;
+  string type       = 4;
+  string color      = 5;
+  string note       = 6;
+}
+
+message DeleteWalletRequest {
+  string session_id = 1;
+  string wallet_id  = 2;
+}
+
+message TransferWalletRequest {
+  string session_id    = 1;
+  string from_wallet_id = 2;
+  string to_wallet_id   = 3;
+  double amount        = 4;
+  string note          = 5;
+  string date          = 6; // YYYY-MM-DD
+}
+
+message WalletResponse {
+  bool   success = 1;
+  string message = 2;
+  Wallet wallet  = 3;
+}
+
+message WalletListResponse {
+  bool             success = 1;
+  repeated Wallet  wallets = 2;
+}
+
+message TransferWalletResponse {
+  bool           success     = 1;
+  string         message     = 2;
+  Wallet         from_wallet = 3;
+  Wallet         to_wallet   = 4;
+  WalletTransfer transfer    = 5;
+}
+
+// ─────────────────────────────────────────────────────────────
+// TRANSACTION SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service TransactionService {
+  rpc CreateTransaction (CreateTransactionRequest)  returns (TransactionResponse);
+  rpc ListTransactions  (ListTransactionsRequest)   returns (TransactionListResponse);
+  rpc UpdateTransaction (UpdateTransactionRequest)  returns (TransactionResponse);
+  rpc DeleteTransaction (DeleteTransactionRequest)  returns (StatusResponse);
+}
+
+message Transaction {
+  string id                = 1;
+  string family_id         = 2;
+  string created_by        = 3; // user_id
+  string type              = 4; // income | expense
+  double amount            = 5;
+  string category_name     = 6;
+  string member            = 7;
+  string date              = 8; // YYYY-MM-DD
+  string note              = 9;
+  string debt_payment_id   = 10; // nullable, UUID if from PayDebt
+  string created_at        = 11;
+  string saving_deposit_id = 12; // nullable, UUID if from DepositSaving
+  string wallet_id         = 13; // nullable, UUID dompet yang digunakan
+  string wallet_name       = 14; // nama dompet (denormalized for display)
+}
+
+message CreateTransactionRequest {
+  string session_id    = 1;
+  string type          = 2; // income | expense
+  double amount        = 3;
+  string category_name = 4;
+  string member        = 5;
+  string date          = 6; // YYYY-MM-DD
+  string note          = 7;
+  string wallet_id     = 8; // optional, UUID dompet
+}
+
+message ListTransactionsRequest {
+  string session_id = 1;
+  string month      = 2; // optional YYYY-MM filter
+}
+
+message UpdateTransactionRequest {
+  string session_id    = 1;
+  string transaction_id = 2;
+  string type          = 3; // income | expense
+  double amount        = 4;
+  string category_name = 5;
+  string member        = 6;
+  string date          = 7; // YYYY-MM-DD
+  string note          = 8;
+  string wallet_id     = 9; // optional, UUID dompet
+}
+
+message DeleteTransactionRequest {
+  string session_id      = 1;
+  string transaction_id  = 2;
+}
+
+message TransactionResponse {
+  bool        success     = 1;
+  string      message     = 2;
+  Transaction transaction = 3;
+}
+
+message TransactionListResponse {
+  bool                 success      = 1;
+  repeated Transaction transactions = 2;
+}
+
+// ─────────────────────────────────────────────────────────────
+// BUDGET SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service BudgetService {
+  rpc SetBudget                    (SetBudgetRequest)                    returns (BudgetResponse);
+  rpc ListBudgets                  (ListBudgetsRequest)                  returns (BudgetListResponse);
+  rpc UpdateBudget                 (UpdateBudgetRequest)                 returns (BudgetResponse);
+  rpc DeleteBudget                 (DeleteBudgetRequest)                 returns (StatusResponse);
+  rpc GetEmergencyFund             (GetEmergencyFundRequest)             returns (EmergencyFundResponse);
+  rpc SetEmergencyFund             (SetEmergencyFundRequest)             returns (EmergencyFundResponse);
+  rpc DepositEmergencyFund         (DepositEmergencyFundRequest)         returns (EmergencyFundResponse);
+  rpc ListEmergencyFundHistory     (ListEmergencyFundHistoryRequest)     returns (EmergencyFundHistoryResponse);
+  // Recurring budgets
+  rpc SetRecurringBudget           (SetRecurringBudgetRequest)           returns (RecurringBudgetResponse);
+  rpc ListRecurringBudgets         (ListRecurringBudgetsRequest)         returns (RecurringBudgetListResponse);
+  rpc DeleteRecurringBudget        (DeleteRecurringBudgetRequest)        returns (StatusResponse);
+  rpc ApplyRecurringBudgets        (ApplyRecurringBudgetsRequest)        returns (ApplyRecurringBudgetsResponse);
+}
+
+message Budget {
+  string id            = 1;
+  string family_id     = 2;
+  string category_name = 3;
+  string month         = 4; // YYYY-MM
+  double amount        = 5;
+  string created_at    = 6;
+}
+
+message SetBudgetRequest {
+  string session_id    = 1;
+  string category_name = 2;
+  string month         = 3; // YYYY-MM
+  double amount        = 4;
+}
+
+message ListBudgetsRequest {
+  string session_id = 1;
+  string month      = 2; // YYYY-MM
+}
+
+message BudgetResponse {
+  bool   success = 1;
+  string message = 2;
+  Budget budget  = 3;
+}
+
+message UpdateBudgetRequest {
+  string session_id    = 1;
+  string budget_id     = 2;
+  double amount        = 3;
+}
+
+message DeleteBudgetRequest {
+  string session_id = 1;
+  string budget_id  = 2;
+}
+
+message BudgetListResponse {
+  bool             success = 1;
+  repeated Budget  budgets = 2;
+}
+
+message RecurringBudget {
+  string id            = 1;
+  string family_id     = 2;
+  string category_name = 3;
+  double amount        = 4;
+  string created_at    = 5;
+}
+
+message SetRecurringBudgetRequest {
+  string session_id    = 1;
+  string category_name = 2;
+  double amount        = 3;
+}
+
+message ListRecurringBudgetsRequest {
+  string session_id = 1;
+}
+
+message DeleteRecurringBudgetRequest {
+  string session_id         = 1;
+  string recurring_budget_id = 2;
+}
+
+message ApplyRecurringBudgetsRequest {
+  string session_id = 1;
+  string month      = 2; // YYYY-MM — bulan yang akan di-apply
+}
+
+message RecurringBudgetResponse {
+  bool            success          = 1;
+  string          message          = 2;
+  RecurringBudget recurring_budget = 3;
+}
+
+message RecurringBudgetListResponse {
+  bool                     success           = 1;
+  repeated RecurringBudget recurring_budgets = 2;
+}
+
+message ApplyRecurringBudgetsResponse {
+  bool   success       = 1;
+  string message       = 2;
+  int32  applied_count = 3; // jumlah anggaran yang dibuat/diupdate
+}
+
+message EmergencyFund {
+  string id                   = 1;
+  string family_id            = 2;
+  double current_balance      = 3;
+  double monthly_expense_avg  = 4;
+  double target_balance       = 5; // stored: monthly_expense_avg * target_months
+  double months_covered       = 6; // stored: current_balance / monthly_expense_avg
+  string updated_at           = 7;
+  int32  target_months        = 8; // default 6, bisa dikustomisasi
+}
+
+message EmergencyFundDeposit {
+  string id         = 1;
+  string family_id  = 2;
+  double amount     = 3; // positif = setor, negatif = tarik
+  string note       = 4;
+  string date       = 5; // YYYY-MM-DD
+  string created_at = 6;
+}
+
+message GetEmergencyFundRequest {
+  string session_id = 1;
+}
+
+message SetEmergencyFundRequest {
+  string session_id      = 1;
+  double current_balance = 2;
+  int32  target_months   = 3; // 0 = tidak diubah (pertahankan nilai lama)
+}
+
+message DepositEmergencyFundRequest {
+  string session_id = 1;
+  double amount     = 2; // positif = setor, negatif = tarik
+  string note       = 3;
+  string date       = 4; // YYYY-MM-DD
+}
+
+message ListEmergencyFundHistoryRequest {
+  string session_id = 1;
+  int32  limit      = 2; // 0 = default 50
+}
+
+message EmergencyFundResponse {
+  bool          success        = 1;
+  string        message        = 2;
+  EmergencyFund emergency_fund = 3;
+}
+
+message EmergencyFundHistoryResponse {
+  bool                         success  = 1;
+  repeated EmergencyFundDeposit history = 2;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DEBT SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service DebtService {
+  rpc CreateDebt        (CreateDebtRequest)        returns (DebtResponse);
+  rpc ListDebts         (ListDebtsRequest)          returns (DebtListResponse);
+  rpc UpdateDebt        (UpdateDebtRequest)         returns (DebtResponse);
+  rpc PayDebt           (PayDebtRequest)            returns (PayDebtResponse);
+  rpc DeleteDebt        (DeleteDebtRequest)         returns (StatusResponse);
+  rpc ListDebtPayments  (ListDebtPaymentsRequest)   returns (DebtPaymentListResponse);
+}
+
+message Debt {
+  string id               = 1;
+  string family_id        = 2;
+  string name             = 3;
+  double total_amount     = 4;
+  double remaining_amount = 5;
+  double monthly_payment  = 6;
+  string due_date         = 7; // YYYY-MM-DD
+  bool   is_paid          = 8;
+  string created_at       = 9;
+  int32  days_until_due   = 10; // stored & updated by server on every write
+}
+
+message DebtPayment {
+  string id         = 1;
+  string debt_id    = 2;
+  string paid_by    = 3; // Ayah | Ibu | Anak
+  double amount     = 4;
+  string date       = 5; // YYYY-MM-DD
+  string created_at = 6;
+}
+
+message CreateDebtRequest {
+  string session_id      = 1;
+  string name            = 2;
+  double total_amount    = 3;
+  double monthly_payment = 4;
+  string due_date        = 5; // YYYY-MM-DD
+}
+
+message ListDebtsRequest {
+  string session_id = 1;
+}
+
+message PayDebtRequest {
+  string session_id = 1;
+  string debt_id    = 2;
+  string paid_by    = 3; // Ayah | Ibu | Anak
+  double amount     = 4;
+  string date       = 5; // YYYY-MM-DD
+}
+
+message UpdateDebtRequest {
+  string session_id      = 1;
+  string debt_id         = 2;
+  string name            = 3;
+  double total_amount    = 4;
+  double monthly_payment = 5;
+  string due_date        = 6; // YYYY-MM-DD
+}
+
+message DeleteDebtRequest {
+  string session_id = 1;
+  string debt_id    = 2;
+}
+
+message ListDebtPaymentsRequest {
+  string session_id = 1;
+  string debt_id    = 2;
+}
+
+message DebtPaymentListResponse {
+  bool                  success  = 1;
+  repeated DebtPayment  payments = 2;
+}
+
+message DebtResponse {
+  bool   success = 1;
+  string message = 2;
+  Debt   debt    = 3;
+}
+
+message DebtListResponse {
+  bool          success = 1;
+  repeated Debt debts   = 2;
+}
+
+message PayDebtResponse {
+  bool        success     = 1;
+  string      message     = 2;
+  Debt        debt        = 3;
+  DebtPayment payment     = 4;
+  Transaction transaction = 5; // auto-created expense transaction
+}
+
+// ─────────────────────────────────────────────────────────────
+// SAVING SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service SavingService {
+  rpc CreateSaving  (CreateSavingRequest)  returns (SavingResponse);
+  rpc ListSavings   (ListSavingsRequest)   returns (SavingListResponse);
+  rpc UpdateSaving  (UpdateSavingRequest)  returns (SavingResponse);
+  rpc DepositSaving (DepositSavingRequest) returns (SavingResponse);
+  rpc DeleteSaving  (DeleteSavingRequest)  returns (StatusResponse);
+}
+
+message Saving {
+  string id               = 1;
+  string family_id        = 2;
+  string name             = 3;
+  double target_amount    = 4;
+  double current_balance  = 5;
+  string target_date      = 6;  // YYYY-MM-DD
+  string created_at       = 7;
+  double monthly_required = 8;  // stored & recalculated by server on every write
+  double progress_pct     = 9;  // stored & recalculated by server on every write
+}
+
+message SavingDeposit {
+  string id         = 1;
+  string saving_id  = 2;
+  double amount     = 3;
+  string date       = 4; // YYYY-MM-DD
+  string note       = 5;
+  string created_at = 6;
+}
+
+message CreateSavingRequest {
+  string session_id      = 1;
+  string name            = 2;
+  double target_amount   = 3;
+  double initial_balance = 4;
+  string target_date     = 5; // YYYY-MM-DD
+}
+
+message ListSavingsRequest {
+  string session_id = 1;
+}
+
+message DepositSavingRequest {
+  string session_id = 1;
+  string saving_id  = 2;
+  double amount     = 3;
+  string date       = 4; // YYYY-MM-DD
+  string note       = 5;
+  string member     = 6; // username yang melakukan setoran
+}
+
+message UpdateSavingRequest {
+  string session_id    = 1;
+  string saving_id     = 2;
+  string name          = 3;
+  double target_amount = 4;
+  string target_date   = 5; // YYYY-MM-DD
+}
+
+message DeleteSavingRequest {
+  string session_id = 1;
+  string saving_id  = 2;
+}
+
+message SavingResponse {
+  bool        success     = 1;
+  string      message     = 2;
+  Saving      saving      = 3;
+  Transaction transaction = 4; // auto-created expense transaction (hanya untuk DepositSaving)
+}
+
+message SavingListResponse {
+  bool            success = 1;
+  repeated Saving savings = 2;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DASHBOARD SERVICE
+// ─────────────────────────────────────────────────────────────
+
+service DashboardService {
+  rpc GetDashboard   (GetDashboardRequest)   returns (DashboardResponse);
+  rpc SeedData       (SeedDataRequest)       returns (StatusResponse);
+  rpc ClearData      (ClearDataRequest)      returns (StatusResponse);
+  rpc ExportBackup   (ExportBackupRequest)   returns (BackupResponse);
+  rpc ImportRestore  (ImportRestoreRequest)  returns (StatusResponse);
+}
+
+message HealthScore {
+  double savings_score        = 1; // max 30
+  double budget_score         = 2; // max 25
+  double emergency_fund_score = 3; // max 25
+  double debt_score           = 4; // max 20
+  double total                = 5; // 0–100
+  string advice               = 6; // auto-generated tip
+}
+
+message CategorySpending {
+  string category_name = 1;
+  double spent         = 2;
+  double budget        = 3;   // 0 if no budget set
+  double remaining     = 4;   // budget - spent (can be negative)
+  double pct_used      = 5;   // spent / budget * 100 (0 if no budget)
+}
+
+message MemberSpending {
+  string member = 1;
+  double spent  = 2;
+}
+
+message MonthlySummary {
+  string month         = 1; // YYYY-MM
+  double total_income  = 2;
+  double total_expense = 3;
+  double balance       = 4; // income - expense
+}
+
+message DashboardResponse {
+  bool                       success                = 1;
+  HealthScore                health_score           = 2;
+  MonthlySummary             this_month             = 3;
+  repeated CategorySpending  category_spending      = 4;
+  repeated MemberSpending    member_spending        = 5;
+  repeated Debt              monthly_debts          = 6;  // hutang aktif yg perlu dibayar bulan ini
+  repeated Saving            savings_summary        = 7;
+  EmergencyFund              emergency_fund         = 8;
+  double                     total_remaining_debt   = 9;  // total sisa semua hutang aktif
+  double                     monthly_debt_total     = 10; // total cicilan semua hutang bulan ini
+}
+
+message GetDashboardRequest {
+  string session_id = 1;
+}
+
+message SeedDataRequest {
+  string session_id = 1;
+}
+
+message ClearDataRequest {
+  string session_id = 1;
+}
+
+message ExportBackupRequest {
+  string session_id = 1;
+}
+
+message BackupResponse {
+  bool   success     = 1;
+  string message     = 2;
+  string json_data   = 3; // seluruh data keluarga dalam format JSON
+  string exported_at = 4; // timestamp ekspor
+}
+
+message ImportRestoreRequest {
+  string session_id = 1;
+  string json_data  = 2; // JSON dari file backup
+}
