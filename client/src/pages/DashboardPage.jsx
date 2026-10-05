@@ -592,7 +592,7 @@ export default function DashboardPage() {
 
         {/* Hutang Bulan Ini */}
         <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">🏦 Hutang Bulan Ini</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">🏦 Hutang</h3>
           <div className="flex gap-2 mb-3">
             <div className="flex-1 bg-red-50 rounded-lg px-3 py-2 text-center">
               <div className="text-[10px] text-gray-400">Total Sisa</div>
