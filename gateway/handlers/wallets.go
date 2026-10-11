@@ -90,6 +90,85 @@ func WalletDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// WalletAdjust — POST /wallets/{id}/adjust
+func WalletAdjust(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var body struct {
+		NewBalance float64 `json:"new_balance"`
+		Note       string  `json:"note"`
+		Date       string  `json:"date"`
+		Member     string  `json:"member"`
+	}
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	if body.Date == "" {
+		writeError(w, http.StatusBadRequest, "date wajib diisi")
+		return
+	}
+
+	// Ambil saldo dompet saat ini
+	listResp, err := grpcclient.Wallet.ListWallets(r.Context(), &finance.ListWalletsRequest{
+		SessionId: middleware.SessionID(r.Context()),
+	})
+	if err != nil {
+		grpcErr(w, err)
+		return
+	}
+
+	var currentBalance float64
+	var found bool
+	for _, wlt := range listResp.GetWallets() {
+		if wlt.Id == id {
+			currentBalance = wlt.Balance
+			found = true
+			break
+		}
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "dompet tidak ditemukan")
+		return
+	}
+
+	delta := body.NewBalance - currentBalance
+	if delta == 0 {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "message": "Saldo tidak berubah"})
+		return
+	}
+
+	txType := "income"
+	amount := delta
+	if delta < 0 {
+		txType = "expense"
+		amount = -delta
+	}
+
+	note := body.Note
+	if note == "" {
+		note = "Penyesuaian saldo manual"
+	}
+	member := body.Member
+	if member == "" {
+		member = "Sistem"
+	}
+
+	resp, err := grpcclient.Transaction.CreateTransaction(r.Context(), &finance.CreateTransactionRequest{
+		SessionId:    middleware.SessionID(r.Context()),
+		Type:         txType,
+		Amount:       amount,
+		CategoryName: "Penyesuaian Saldo",
+		Member:       member,
+		Date:         body.Date,
+		Note:         note,
+		WalletId:     id,
+	})
+	if err != nil {
+		grpcErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // WalletTransfer — POST /wallets/transfer
 func WalletTransfer(w http.ResponseWriter, r *http.Request) {
 	var body struct {

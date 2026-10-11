@@ -62,6 +62,7 @@ func main() {
 		r.Get("/wallets", handlers.WalletList)
 		r.Post("/wallets", handlers.WalletCreate)
 		r.Post("/wallets/transfer", handlers.WalletTransfer)
+		r.Post("/wallets/{id}/adjust", handlers.WalletAdjust)
 		r.Put("/wallets/{id}", handlers.WalletUpdate)
 		r.Delete("/wallets/{id}", handlers.WalletDelete)
 

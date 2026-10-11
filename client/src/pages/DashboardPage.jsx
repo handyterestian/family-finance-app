@@ -141,7 +141,10 @@ export default function DashboardPage() {
           wallet_id: wallet_id || undefined,
         })
       } else if (domain === 'hutang') {
-        await api.post(`/debts/${debt_id}/pay`, { paid_by: username, amount: amt, date })
+        await api.post(`/debts/${debt_id}/pay`, {
+          paid_by: username, amount: amt, date,
+          wallet_id: wallet_id || undefined,
+        })
         api.get('/debts').then(r => setDebts((r.data.debts || []).filter(d => !d.is_paid)))
       } else if (domain === 'dana-darurat') {
         const signedAmt = ef_direction === 'tarik' ? -Math.abs(amt) : Math.abs(amt)
@@ -436,6 +439,19 @@ export default function DashboardPage() {
                   }} required>
                   <option value="">-- Pilih --</option>
                   {debts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {txForm.domain === 'hutang' && wallets.length > 0 && (
+              <div>
+                <label className="label">Dompet</label>
+                <select className="input" value={txForm.wallet_id}
+                  onChange={e => setTxForm(f => ({ ...f, wallet_id: e.target.value }))}>
+                  <option value="">-- Tanpa Dompet --</option>
+                  {wallets.map(w => (
+                    <option key={w.id} value={w.id}>{w.name} ({rupiah(w.balance)})</option>
+                  ))}
                 </select>
               </div>
             )}

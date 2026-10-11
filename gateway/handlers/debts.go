@@ -80,9 +80,10 @@ func DebtUpdate(w http.ResponseWriter, r *http.Request) {
 func DebtPay(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var body struct {
-		PaidBy string  `json:"paid_by"`
-		Amount float64 `json:"amount"`
-		Date   string  `json:"date"`
+		PaidBy   string  `json:"paid_by"`
+		Amount   float64 `json:"amount"`
+		Date     string  `json:"date"`
+		WalletId string  `json:"wallet_id"`
 	}
 	if !decodeJSON(w, r, &body) {
 		return
@@ -94,6 +95,7 @@ func DebtPay(w http.ResponseWriter, r *http.Request) {
 		PaidBy:    body.PaidBy,
 		Amount:    body.Amount,
 		Date:      body.Date,
+		WalletId:  body.WalletId,
 	})
 	if err != nil {
 		grpcErr(w, err)

@@ -3980,7 +3980,8 @@ type PayDebtRequest struct {
 	DebtId    string  `protobuf:"bytes,2,opt,name=debt_id,json=debtId,proto3" json:"debt_id,omitempty"`
 	PaidBy    string  `protobuf:"bytes,3,opt,name=paid_by,json=paidBy,proto3" json:"paid_by,omitempty"` // Ayah | Ibu | Anak
 	Amount    float64 `protobuf:"fixed64,4,opt,name=amount,proto3" json:"amount,omitempty"`
-	Date      string  `protobuf:"bytes,5,opt,name=date,proto3" json:"date,omitempty"` // YYYY-MM-DD
+	Date      string  `protobuf:"bytes,5,opt,name=date,proto3" json:"date,omitempty"`              // YYYY-MM-DD
+	WalletId  string  `protobuf:"bytes,6,opt,name=wallet_id,json=walletId,proto3" json:"wallet_id,omitempty"` // optional, UUID dompet
 }
 
 func (x *PayDebtRequest) Reset() {
@@ -4046,6 +4047,13 @@ func (x *PayDebtRequest) GetAmount() float64 {
 func (x *PayDebtRequest) GetDate() string {
 	if x != nil {
 		return x.Date
+	}
+	return ""
+}
+
+func (x *PayDebtRequest) GetWalletId() string {
+	if x != nil {
+		return x.WalletId
 	}
 	return ""
 }

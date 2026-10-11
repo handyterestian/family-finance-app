@@ -165,6 +165,17 @@ func (s *DebtServer) PayDebt(ctx context.Context, req *finance.PayDebtRequest) (
 		return nil, status.Error(codes.FailedPrecondition, "hutang sudah lunas")
 	}
 
+	// Kurangi saldo dompet jika wallet_id diberikan
+	if req.WalletId != "" {
+		res, err := tx.Exec(ctx,
+			`UPDATE wallets SET balance = balance - $1 WHERE id = $2 AND family_id = $3`,
+			req.Amount, req.WalletId, sess.FamilyID,
+		)
+		if err != nil || res.RowsAffected() == 0 {
+			return nil, status.Error(codes.NotFound, "dompet tidak ditemukan")
+		}
+	}
+
 	// Hitung sisa setelah pembayaran
 	newRemaining := d.RemainingAmount - req.Amount
 	if newRemaining < 0 {
@@ -199,20 +210,28 @@ func (s *DebtServer) PayDebt(ctx context.Context, req *finance.PayDebtRequest) (
 		return nil, status.Error(codes.Internal, "gagal insert debt_payment")
 	}
 
-	// Insert transaksi pengeluaran otomatis
+	// walletIDArg: nil jika kosong agar DB menerima NULL
+	var walletArg interface{}
+	if req.WalletId != "" {
+		walletArg = req.WalletId
+	}
+
+	// Insert transaksi pengeluaran otomatis (dengan wallet_id jika ada)
 	trx := &finance.Transaction{}
 	err = tx.QueryRow(ctx, `
 		INSERT INTO transactions
-		  (family_id, created_by, type, amount, category_name, member, date, note, debt_payment_id)
-		VALUES ($1, $2, 'expense', $3, 'Cicilan Hutang', $4, $5::date, $6, $7)
+		  (family_id, created_by, type, amount, category_name, member, date, note, debt_payment_id, wallet_id)
+		VALUES ($1, $2, 'expense', $3, 'Cicilan Hutang', $4, $5::date, $6, $7, $8::uuid)
 		RETURNING id, family_id, created_by, type, amount::float8,
 		          category_name, member, date::text, note,
 		          COALESCE(debt_payment_id::text,''), created_at::text,
-		          COALESCE(saving_deposit_id::text,'')`,
+		          COALESCE(saving_deposit_id::text,''),
+		          COALESCE(wallet_id::text,''), ''`,
 		sess.FamilyID, sess.UserID, req.Amount, req.PaidBy, payDate,
-		fmt.Sprintf("Bayar cicilan: %s", d.Name), pmt.Id,
+		fmt.Sprintf("Bayar cicilan: %s", d.Name), pmt.Id, walletArg,
 	).Scan(&trx.Id, &trx.FamilyId, &trx.CreatedBy, &trx.Type, &trx.Amount,
-		&trx.CategoryName, &trx.Member, &trx.Date, &trx.Note, &trx.DebtPaymentId, &trx.CreatedAt, &trx.SavingDepositId)
+		&trx.CategoryName, &trx.Member, &trx.Date, &trx.Note, &trx.DebtPaymentId, &trx.CreatedAt,
+		&trx.SavingDepositId, &trx.WalletId, &trx.WalletName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "gagal insert transaksi cicilan")
 	}

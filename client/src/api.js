@@ -8,11 +8,12 @@ const api = axios.create({
 
 // ── Wallet API ────────────────────────────────────────────────
 export const walletAPI = {
-  list:     ()       => api.get('/wallets'),
-  create:   (data)   => api.post('/wallets', data),
-  update:   (id, d)  => api.put(`/wallets/${id}`, d),
-  delete:   (id)     => api.delete(`/wallets/${id}`),
-  transfer: (data)   => api.post('/wallets/transfer', data),
+  list:     ()         => api.get('/wallets'),
+  create:   (data)     => api.post('/wallets', data),
+  update:   (id, d)    => api.put(`/wallets/${id}`, d),
+  delete:   (id)       => api.delete(`/wallets/${id}`),
+  transfer: (data)     => api.post('/wallets/transfer', data),
+  adjust:   (id, data) => api.post(`/wallets/${id}/adjust`, data),
 }
 
 // Intercept 401 → set flag dan biarkan React Router yang handle redirect,

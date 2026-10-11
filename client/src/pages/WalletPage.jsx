@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { walletAPI } from '../api.js'
-import { rupiah as fmt } from '../utils.js'
+import { rupiah as fmt, today } from '../utils.js'
 import { usePageFocus } from '../hooks/usePageFocus.js'
+import { useCurrentUser } from '../App.jsx'
 
 const WALLET_TYPES = [
   { value: 'cash',       label: '💵 Tunai' },
@@ -20,7 +21,7 @@ function typeLabel(type) {
   return WALLET_TYPES.find(t => t.value === type)?.label || type
 }
 
-function WalletCard({ w, onEdit, onDelete, onTransfer }) {
+function WalletCard({ w, onEdit, onDelete, onTransfer, onAdjust }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between">
@@ -39,12 +40,16 @@ function WalletCard({ w, onEdit, onDelete, onTransfer }) {
           className="flex-1 text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium">
           ⇄ Transfer
         </button>
+        <button onClick={() => onAdjust(w)}
+          className="flex-1 text-xs py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium">
+          ⚖️ Sesuaikan
+        </button>
         <button onClick={() => onEdit(w)}
-          className="flex-1 text-xs py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
-          ✏️ Edit
+          className="text-xs py-1.5 px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+          ✏️
         </button>
         <button onClick={() => onDelete(w)}
-          className="flex-1 text-xs py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
+          className="text-xs py-1.5 px-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
           🗑
         </button>
       </div>
@@ -158,6 +163,117 @@ function WalletModal({ initial, onSave, onClose }) {
   )
 }
 
+function AdjustModal({ wallet, username, onSave, onClose }) {
+  const [form, setForm] = useState({
+    new_balance: wallet.balance ?? 0,
+    note: '',
+    date: today(),
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const delta = Number(form.new_balance) - wallet.balance
+  const deltaAbs = Math.abs(delta)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true); setErr('')
+    try {
+      await onSave(wallet.id, { ...form, new_balance: Number(form.new_balance), member: username })
+      onClose()
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Gagal menyesuaikan saldo')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex justify-between items-center px-5 pt-5 pb-3 border-b">
+          <div>
+            <h3 className="font-semibold text-gray-800">⚖️ Sesuaikan Saldo</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{wallet.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+          {err && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+
+          {/* Info saldo sekarang */}
+          <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
+            <span className="text-gray-500">Saldo saat ini</span>
+            <span className="font-semibold text-gray-800">{fmt(wallet.balance)}</span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Saldo Baru (Rp)</label>
+            <input
+              type="number" min="0" step="any" required
+              value={form.new_balance}
+              onChange={e => set('new_balance', e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 outline-none"
+            />
+          </div>
+
+          {/* Preview selisih */}
+          {delta !== 0 && (
+            <div className={`rounded-xl px-4 py-3 text-sm flex items-center justify-between ${
+              delta > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+            }`}>
+              <span>{delta > 0 ? '↑ Penambahan saldo' : '↓ Pengurangan saldo'}</span>
+              <span className="font-semibold">{fmt(deltaAbs)}</span>
+            </div>
+          )}
+          {delta === 0 && form.new_balance !== '' && (
+            <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-500 text-center">
+              Saldo tidak berubah
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+              <input type="date" required
+                value={form.date}
+                onChange={e => set('date', e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Catatan (opsional)</label>
+              <input
+                value={form.note}
+                onChange={e => set('note', e.target.value)}
+                placeholder="Cth: koreksi saldo"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 outline-none"
+              />
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            Penyesuaian akan otomatis tercatat sebagai transaksi &quot;Penyesuaian Saldo&quot; di halaman Transaksi.
+          </p>
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 border border-gray-300 text-gray-700 rounded-xl py-2 text-sm hover:bg-gray-50">
+              Batal
+            </button>
+            <button type="submit" disabled={saving || delta === 0}
+              className="flex-1 bg-amber-500 text-white rounded-xl py-2 text-sm font-medium hover:bg-amber-600 disabled:opacity-50">
+              {saving ? 'Memproses…' : 'Simpan Penyesuaian'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function TransferModal({ wallets, initial, onSave, onClose }) {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
@@ -255,10 +371,14 @@ function TransferModal({ wallets, initial, onSave, onClose }) {
 }
 
 export default function WalletPage() {
+  const currentUser = useCurrentUser()
+  const username = currentUser?.username || ''
+
   const [wallets, setWallets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(null) // null | 'create' | {wallet} | 'transfer' | {transfer,wallet}
+  const [modal, setModal] = useState(null) // null | 'create' | {wallet} | 'transfer' | {adjust,wallet}
   const [transferTarget, setTransferTarget] = useState(null)
+  const [adjustTarget, setAdjustTarget] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   async function load() {
@@ -296,6 +416,11 @@ export default function WalletPage() {
 
   async function handleTransfer(form) {
     await walletAPI.transfer(form)
+    await load()
+  }
+
+  async function handleAdjust(id, form) {
+    await walletAPI.adjust(id, form)
     await load()
   }
 
@@ -340,6 +465,7 @@ export default function WalletPage() {
               onEdit={w => setModal(w)}
               onDelete={handleDelete}
               onTransfer={w => { setTransferTarget(w); setModal('transfer') }}
+              onAdjust={w => { setAdjustTarget(w); setModal('adjust') }}
             />
           ))}
         </div>
@@ -383,6 +509,16 @@ export default function WalletPage() {
           initial={transferTarget}
           onSave={handleTransfer}
           onClose={() => { setModal(null); setTransferTarget(null) }}
+        />
+      )}
+
+      {/* Modal penyesuaian saldo */}
+      {modal === 'adjust' && adjustTarget && (
+        <AdjustModal
+          wallet={adjustTarget}
+          username={username}
+          onSave={handleAdjust}
+          onClose={() => { setModal(null); setAdjustTarget(null) }}
         />
       )}
     </div>

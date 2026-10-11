@@ -475,6 +475,7 @@ message PayDebtRequest {
   string paid_by    = 3; // Ayah | Ibu | Anak
   double amount     = 4;
   string date       = 5; // YYYY-MM-DD
+  string wallet_id  = 6; // optional, UUID dompet yang digunakan untuk bayar
 }
 
 message UpdateDebtRequest {

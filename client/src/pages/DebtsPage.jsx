@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import api from '../api.js'
+import { useState, useEffect } from 'react'
+import api, { walletAPI } from '../api.js'
 import { rupiah, fmtDate, today, pct } from '../utils.js'
 import Modal from '../components/Modal.jsx'
 import { usePageFocus } from '../hooks/usePageFocus.js'
@@ -12,11 +12,12 @@ export default function DebtsPage() {
   const username = currentUser?.username || ''
 
   const [debts, setDebts] = useState([])
+  const [wallets, setWallets] = useState([])
   const [showCreate, setShowCreate] = useState(false)
   const [editDebt, setEditDebt] = useState(null)
   const [payDebt, setPayDebt] = useState(null)
   const [form, setForm] = useState(EMPTY_DEBT)
-  const [payForm, setPayForm] = useState({ paid_by: username, amount: '', date: today() })
+  const [payForm, setPayForm] = useState({ paid_by: username, amount: '', date: today(), wallet_id: '' })
   const [loading, setLoading] = useState(false)
   // expandedPayments: { [debtId]: DebtPayment[] | null }
   const [expandedPayments, setExpandedPayments] = useState({})
@@ -24,6 +25,10 @@ export default function DebtsPage() {
 
   const load = () => api.get('/debts').then(r => setDebts(r.data.debts || []))
   usePageFocus(load)
+
+  useEffect(() => {
+    walletAPI.list().then(r => setWallets(r.data.wallets || [])).catch(() => {})
+  }, [])
 
   const openCreate = () => { setForm(EMPTY_DEBT); setEditDebt(null); setShowCreate(true) }
   const openEdit = (d) => {
@@ -89,6 +94,7 @@ export default function DebtsPage() {
       await api.post(`/debts/${payDebt.id}/pay`, {
         ...payForm,
         amount: parseFloat(payForm.amount),
+        wallet_id: payForm.wallet_id || undefined,
       })
       setPayDebt(null)
       // Refresh daftar hutang
@@ -187,7 +193,7 @@ export default function DebtsPage() {
                 {!d.is_paid && (
                   <>
                     <button
-                      onClick={() => { setPayDebt(d); setPayForm({ paid_by: username, amount: d.monthly_payment, date: today() }) }}
+                      onClick={() => { setPayDebt(d); setPayForm({ paid_by: username, amount: d.monthly_payment, date: today(), wallet_id: '' }) }}
                       className="btn-primary flex-1 text-xs py-1.5"
                     >
                       💳 Bayar Cicilan
@@ -280,6 +286,18 @@ export default function DebtsPage() {
               <input className="input" type="number" min="1" step="any" value={payForm.amount}
                 onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} required />
             </div>
+            {wallets.length > 0 && (
+              <div>
+                <label className="label">Bayar dari Dompet</label>
+                <select className="input" value={payForm.wallet_id}
+                  onChange={e => setPayForm(f => ({ ...f, wallet_id: e.target.value }))}>
+                  <option value="">-- Tanpa Dompet --</option>
+                  {wallets.map(w => (
+                    <option key={w.id} value={w.id}>{w.name} ({rupiah(w.balance)})</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="label">Tanggal Bayar</label>
               <input className="input" type="date" value={payForm.date}
