@@ -23,6 +23,10 @@ export default function BudgetsPage() {
   const [spending, setSpending] = useState({})
   const [loading, setLoading] = useState(false)
   const [copyLoading, setCopyLoading] = useState(false)
+  const [debts, setDebts] = useState([])
+  const [debtLoading, setDebtLoading] = useState(false)
+  // Estimasi pendapatan: rata-rata pemasukan 3 bulan sebelumnya + realisasi bulan terpilih
+  const [incomeEst, setIncomeEst] = useState({ avg: 0, monthsWithData: 0, actual: 0 })
 
   // ── Recurring budget state ────────────────────────────────
   const [recurring, setRecurring] = useState([])
@@ -36,13 +40,29 @@ export default function BudgetsPage() {
     api.get('/budgets/emergency').then(r => setEf(r.data.emergency_fund))
     api.get('/budgets/recurring').then(r => setRecurring(r.data.recurring_budgets || []))
     api.get('/categories').then(r => setCats(r.data.categories || []))
+    api.get('/debts').then(r => setDebts(r.data.debts || [])).catch(() => setDebts([]))
     // Ambil pengeluaran bulan ini per kategori dari transactions
     api.get('/transactions', { params: { month } }).then(r => {
       const sp = {}
+      let actualIncome = 0
       for (const t of (r.data.transactions || [])) {
         if (t.type === 'expense') sp[t.category_name] = (sp[t.category_name] || 0) + t.amount
+        else if (t.type === 'income') actualIncome += t.amount
       }
       setSpending(sp)
+      setIncomeEst(e => ({ ...e, actual: actualIncome }))
+    })
+    // Pemasukan 3 bulan sebelumnya untuk estimasi pendapatan
+    const prevMonths = []
+    for (let i = 0, m = month; i < 3; i++) { m = prevMonth(m); prevMonths.push(m) }
+    Promise.all(prevMonths.map(m =>
+      api.get('/transactions', { params: { month: m } })
+        .then(r => (r.data.transactions || []).reduce((s, t) => s + (t.type === 'income' ? t.amount : 0), 0))
+        .catch(() => 0)
+    )).then(totals => {
+      const withData = totals.filter(t => t > 0)
+      const avg = withData.length ? withData.reduce((s, t) => s + t, 0) / withData.length : 0
+      setIncomeEst(e => ({ ...e, avg, monthsWithData: withData.length }))
     })
   }, [month])
 
@@ -168,6 +188,44 @@ export default function BudgetsPage() {
     }
   }
 
+  // ── Anggaran cicilan hutang (bulan berjalan) ──────────────
+  const DEBT_CATEGORY = 'Cicilan Hutang'
+  const activeDebts = debts.filter(d => !d.is_paid && d.remaining_amount > 0)
+  // Cicilan bulanan tidak melebihi sisa hutang
+  const debtBudgetAmount = activeDebts.reduce(
+    (s, d) => s + Math.min(d.monthly_payment, d.remaining_amount), 0
+  )
+  const existingDebtBudget = budgets.find(b => b.category_name === DEBT_CATEGORY)
+  const showDebtBanner = month === thisMonth() && activeDebts.length > 0 &&
+    (!existingDebtBudget || existingDebtBudget.amount !== debtBudgetAmount)
+
+  const handleAddDebtBudget = async () => {
+    const msg = existingDebtBudget
+      ? `Ubah anggaran "${DEBT_CATEGORY}" bulan ${month} dari ${rupiah(existingDebtBudget.amount)} menjadi ${rupiah(debtBudgetAmount)}?`
+      : `Tambah anggaran "${DEBT_CATEGORY}" ${rupiah(debtBudgetAmount)} untuk bulan ${month}?`
+    if (!confirm(msg)) return
+    setDebtLoading(true)
+    try {
+      await api.post('/budgets', { category_name: DEBT_CATEGORY, month, amount: debtBudgetAmount })
+      loadAll()
+    } catch (e) {
+      alert(e.response?.data?.error || 'Gagal menambah anggaran hutang')
+    } finally {
+      setDebtLoading(false)
+    }
+  }
+
+  // Ringkasan total anggaran bulan terpilih (default: bulan berjalan)
+  const totalBudget = budgets.reduce((s, b) => s + b.amount, 0)
+  const totalSpent = budgets.reduce((s, b) => s + (spending[b.category_name] || 0), 0)
+  const totalRemaining = totalBudget - totalSpent
+  const totalPct = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0
+
+  // Estimasi pendapatan: pakai rata-rata historis; jika belum ada, pakai realisasi bulan ini
+  const estIncome = incomeEst.avg > 0 ? incomeEst.avg : incomeEst.actual
+  const estBalance = estIncome - totalBudget
+  const budgetOfIncomePct = estIncome > 0 ? (totalBudget / estIncome) * 100 : 0
+
   const expenseCats = cats.filter(c => c.type === 'expense' || c.type === 'both')
   // Kategori yang belum ada di recurring (untuk form tambah)
   const availableCatsForRecurring = expenseCats.filter(
@@ -185,6 +243,97 @@ export default function BudgetsPage() {
           </button>
           <button onClick={openCreate} className="btn-primary text-sm">+ Atur Anggaran</button>
         </div>
+      </div>
+
+      {/* Saran anggaran cicilan hutang */}
+      {showDebtBanner && (
+        <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-amber-200 bg-amber-50">
+          <div>
+            <div className="text-sm font-semibold text-amber-800">🏦 Ada {activeDebts.length} hutang aktif bulan ini</div>
+            <div className="text-xs text-amber-700 mt-0.5">
+              Total cicilan bulan ini {rupiah(debtBudgetAmount)} belum {existingDebtBudget ? 'sesuai dengan' : 'masuk ke'} anggaran "{DEBT_CATEGORY}".
+            </div>
+          </div>
+          <button onClick={handleAddDebtBudget} disabled={debtLoading} className="btn-primary text-sm whitespace-nowrap">
+            {debtLoading ? 'Menyimpan...' : existingDebtBudget ? 'Perbarui Anggaran Hutang' : '+ Tambah Anggaran Hutang'}
+          </button>
+        </div>
+      )}
+
+      {/* Ringkasan Total Anggaran */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Total Anggaran {month === thisMonth() ? 'Bulan Berjalan' : 'Bulan Terpilih'} ({month})
+          </h3>
+          <span className="text-xs text-gray-400">{budgets.length} kategori</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <div className="text-xs text-gray-400">Total Anggaran</div>
+            <div className="text-lg font-bold text-gray-800">{rupiah(totalBudget)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-400">Total Terpakai</div>
+            <div className="text-lg font-bold text-red-500">{rupiah(totalSpent)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-400">Total Sisa</div>
+            <div className={`text-lg font-bold ${totalRemaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {rupiah(totalRemaining)}
+            </div>
+          </div>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
+          <div className={`h-full rounded-full ${progressColor(totalPct)}`} style={{ width: `${totalPct}%` }} />
+        </div>
+        <div className="text-xs text-gray-400 mt-0.5 text-right">{totalPct.toFixed(0)}% terpakai</div>
+      </div>
+
+      {/* Estimasi Pendapatan */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">💰 Estimasi Pendapatan ({month})</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {incomeEst.avg > 0
+                ? `Rata-rata pemasukan ${incomeEst.monthsWithData} bulan terakhir yang memiliki data`
+                : 'Belum ada riwayat pemasukan 3 bulan terakhir — memakai realisasi bulan ini'}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <div className="text-xs text-gray-400">Estimasi Pendapatan</div>
+            <div className="text-lg font-bold text-gray-800">{rupiah(estIncome)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-400">Realisasi Bulan Ini</div>
+            <div className="text-lg font-bold text-green-600">{rupiah(incomeEst.actual)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-400">Estimasi Sisa setelah Anggaran</div>
+            <div className={`text-lg font-bold ${estBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {rupiah(estBalance)}
+            </div>
+          </div>
+        </div>
+        {estIncome > 0 && (
+          <>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
+              <div className={`h-full rounded-full ${progressColor(Math.min(100, budgetOfIncomePct))}`}
+                style={{ width: `${Math.min(100, budgetOfIncomePct)}%` }} />
+            </div>
+            <div className="text-xs text-gray-400 mt-0.5 text-right">
+              Anggaran = {budgetOfIncomePct.toFixed(0)}% dari estimasi pendapatan
+            </div>
+            {estBalance < 0 && (
+              <div className="text-xs text-red-600 mt-1">
+                ⚠ Total anggaran melebihi estimasi pendapatan sebesar {rupiah(-estBalance)}.
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Tabel Anggaran */}
