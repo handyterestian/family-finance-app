@@ -14,7 +14,7 @@ Aplikasi manajemen keuangan keluarga berbasis web modern dengan arsitektur micro
 | **Core Service (gRPC)** | Go 1.23 + pgx/v5 | Server backend bisnis logika dengan komunikasi gRPC biner |
 | **Protokol Komunikasi** | Protocol Buffers (proto3) | Kontrak antarmuka service data yang terstruktur & type-safe |
 | **Database** | PostgreSQL 15 Alpine | Database relasional persisten dengan ekstensi `pgcrypto` |
-| **Orkestrasi** | Docker Compose | Manajemen multi-container terisolasi dalam satu private network |
+| **Orkestrasi** | Podman + Terraform | Build image & manajemen container/network/volume secara deklaratif (IaC) |
 
 ---
 
@@ -48,7 +48,7 @@ Browser (Port 8080)
                             │
                             ▼ SQL Queries / pgcrypto
 ┌────────────────────────────────────────────────────────┐
-│ PostgreSQL 15 (Port 5432, Internal Volume Persisten)   │
+│ PostgreSQL 18 (Port 5432, Internal Volume Persisten)   │
 │ └── 15 Relational Tables with Foreign Key Constraints  │
 └────────────────────────────────────────────────────────┘
 ```
@@ -57,9 +57,11 @@ Browser (Port 8080)
 
 ## 📋 Prasyarat Sistem
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) v24+ (Windows / macOS / Linux)
-- [Docker Compose](https://docs.docker.com/compose/) v2.20+
+- [Podman](https://podman.io/) v4.4+ (rootless didukung)
+- Systemd user session aktif (untuk `podman.socket`)
 - Port `8080` tersedia di mesin host
+
+Terraform **tidak perlu di-install di host** — skrip `terraform.sh` menjalankannya di dalam container Podman sementara.
 
 ---
 
@@ -70,23 +72,40 @@ Browser (Port 8080)
 cd family-finance-app
 ```
 
-### 2. (Opsional) Salin Environment Variables
+### 2. Aktifkan Podman API Socket
 ```bash
-cp .env.example .env
+systemctl --user enable --now podman.socket
 ```
 
-### 3. Build & Jalankan Container
+### 3. (Opsional) Sesuaikan Konfigurasi
 ```bash
-# Build dan jalankan seluruh container
-docker compose up --build
-
-# Atau jalankan di background (detached mode)
-docker compose up --build -d
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
-### 4. Buka Aplikasi di Browser
+### 4. Build & Jalankan Seluruh Stack dengan Terraform
+```bash
+# Unduh provider Podman
+./terraform.sh init
+
+# Build image dari Containerfile lalu buat network, volume, dan container
+./terraform.sh apply -auto-approve
+```
+
+Perintah di atas membangun image `db`, `server`, `gateway`, dan `client`, lalu menjalankannya di network Podman privat.
+
+### 5. Buka Aplikasi di Browser
 Akses antarmuka web melalui browser:
 👉 **[http://localhost:8080](http://localhost:8080)**
+
+### Perintah Berguna
+```bash
+./terraform.sh plan                 # Lihat perubahan yang akan diterapkan
+./terraform.sh output               # Lihat URL, nama container, dan volume
+./terraform.sh apply -auto-approve  # Rebuild image yang source-nya berubah + terapkan
+./terraform.sh destroy              # Hentikan & hapus container/network (volume tetap)
+podman ps                           # Cek status container
+podman logs -f finance_server       # Lihat log server gRPC
+```
 
 ---
 
@@ -103,11 +122,14 @@ Akses antarmuka web melalui browser:
 ## 🛑 Menghentikan & Membersihkan Container
 
 ```bash
-# Menghentikan container tanpa menghapus data database
-docker compose down
+# Hentikan dan hapus container + network (data database di volume tetap aman)
+./terraform.sh destroy -auto-approve
 
-# Menghentikan container dan MENGHAPUS volume database (reset total)
-docker compose down -v
+# Hapus total termasuk volume database & backup (reset penuh)
+podman volume rm family-finance-pgdata family-finance-backups
+
+# Hapus image hasil build
+podman rmi localhost/family-finance-{db,server,gateway,client}:latest
 ```
 
 ---
@@ -195,7 +217,7 @@ family-finance-app/
 │   │   ├── dashboard.go             # Kalkulasi Skor Kesehatan, Seed & Backup
 │   │   └── autobackup.go            # Scheduler Cadangan Database Mingguan
 │   ├── schema.sql                   # Skema DDL Database PostgreSQL (15 Tabel)
-│   └── Dockerfile                   # Multi-stage Dockerfile (Go Compiler + Runtime)
+│   └── Containerfile                # Multi-stage build (Go Compiler + Runtime)
 │
 ├── gateway/                         # Go HTTP REST API Gateway
 │   ├── main.go                      # HTTP Server & Route Definitions (chi router)
@@ -213,7 +235,7 @@ family-finance-app/
 │   │   ├── categories.go
 │   │   ├── dashboard.go
 │   │   └── helpers.go
-│   └── Dockerfile                   # Multi-stage Dockerfile Gateway
+│   └── Containerfile                # Multi-stage build Gateway
 │
 ├── client/                          # React Frontend Application (SPA)
 │   ├── src/
@@ -233,8 +255,17 @@ family-finance-app/
 │   │   ├── api.js                   # Axios HTTP Client Configuration
 │   │   └── utils.js                 # Helper Format Rupiah, Tanggal, dll
 │   ├── nginx.conf                   # Konfigurasi Nginx Web Server & Proxy
-│   └── Dockerfile                   # Multi-stage Dockerfile (Node Build + Nginx)
+│   └── Containerfile                # Multi-stage build (Node Build + Nginx unprivileged)
 │
-├── docker-compose.yml               # Definisi Orkestrasi Multi-Container
-└── .env.example                     # Template Konfigurasi Environment Variable
+├── db/
+│   └── Containerfile                # Image PostgreSQL + schema.sql
+│
+├── terraform/                       # Infrastruktur Podman sebagai kode (HCL)
+│   ├── versions.tf                  # Provider blechschmidt/podman
+│   ├── variables.tf                 # Port, kredensial DB, nama project
+│   ├── main.tf                      # Network, volume, image build, container
+│   ├── outputs.tf                   # URL, nama container, volume
+│   └── terraform.tfvars.example     # Template konfigurasi
+│
+└── terraform.sh                     # Wrapper: jalankan Terraform di container Podman
 ```

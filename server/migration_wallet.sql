@@ -2,9 +2,9 @@
 -- Migration: tambah tabel wallets, wallet_transfers,
 --            dan kolom wallet_id di transactions
 -- Jalankan di container DB yang sudah berjalan:
---   docker exec finance_db psql -U finance_user -d finance_db -f /migration_wallet.sql
+--   podman exec finance_db psql -U finance_user -d finance_db -f /migration_wallet.sql
 -- Atau di dev:
---   docker exec finance_db_dev psql -U finance_user -d finance_db -f /migration_wallet.sql
+--   podman exec finance_db_dev psql -U finance_user -d finance_db -f /migration_wallet.sql
 -- ─────────────────────────────────────────────────────────────
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";

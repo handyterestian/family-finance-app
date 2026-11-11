@@ -1,0 +1,9 @@
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.*
+terraform/*.tfvars
+!terraform/terraform.tfvars.example
+client/node_modules/
+client/dist/
+**/go.sum

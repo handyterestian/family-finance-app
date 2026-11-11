@@ -1,0 +1,8 @@
+server/generated/
+server/go.sum
+server/tmp/
+gateway/generated/
+gateway/go.sum
+gateway/tmp/
+**/node_modules
+**/.git

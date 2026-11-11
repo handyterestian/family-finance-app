@@ -1,0 +1,9 @@
+project_name = "family-finance"
+image_tag    = "latest"
+http_port    = 8080
+
+db_user     = "finance_user"
+db_password = "finance_pass"
+db_name     = "finance_db"
+
+cors_origin = "http://localhost:8080"
